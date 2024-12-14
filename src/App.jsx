@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Container, Title, Stack, Textarea, Button, Text, LoadingOverlay, Paper, Group, TextInput } from '@mantine/core'
 import { IconMicrophone, IconFileText, IconFileUpload } from '@tabler/icons-react'
 
@@ -11,6 +11,8 @@ export default function App() {
   const [error, setError] = useState(null)
   const [apiKey, setApiKey] = useState('')
   const [isRecording, setIsRecording] = useState(false)
+  const mediaRecorder = useRef(null)
+  const audioChunks = useRef([])
 
   const startRecording = async () => {
     if (!apiKey) {
@@ -24,21 +26,26 @@ export default function App() {
         video: false
       })
       
-      const mediaRecorder = new MediaRecorder(stream)
-      const audioChunks = []
+      mediaRecorder.current = new MediaRecorder(stream)
+      audioChunks.current = []
 
-      mediaRecorder.ondataavailable = (event) => {
+      mediaRecorder.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunks.push(event.data)
+          audioChunks.current.push(event.data)
         }
       }
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
-        await handleAudioData(audioBlob)
+      mediaRecorder.current.onstop = async () => {
+        try {
+          const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' })
+          await handleAudioData(audioBlob)
+        } catch (error) {
+          console.error('Error processing audio:', error)
+          setError('Error processing audio recording')
+        }
       }
 
-      mediaRecorder.start()
+      mediaRecorder.current.start(200)
       setIsRecording(true)
     } catch (err) {
       console.error('Error accessing microphone:', err)
@@ -47,11 +54,9 @@ export default function App() {
   }
 
   const stopRecording = () => {
-    if (isRecording) {
-      const tracks = navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-          stream.getTracks().forEach(track => track.stop())
-        })
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop()
+      mediaRecorder.current.stream.getTracks().forEach(track => track.stop())
       setIsRecording(false)
     }
   }
@@ -129,7 +134,8 @@ export default function App() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to transcribe audio')
+        const errorData = await response.json()
+        throw new Error(errorData.error?.message || 'Failed to transcribe audio')
       }
 
       const data = await response.json()
