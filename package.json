@@ -1,5 +1,5 @@
 {
-  "name": "voice-to-text-app",
+  "name": "voice-processing-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,13 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mantine/core": "^7.2.2",
-    "@mantine/hooks": "^7.2.2",
-    "@tabler/icons-react": "^3.24.0",
-    "openai": "^4.20.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-icons": "^4.12.0"
+    "@mantine/core": "^7.2.2",
+    "@mantine/hooks": "^7.2.2",
+    "@tabler/icons-react": "^2.40.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
