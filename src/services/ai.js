@@ -14,14 +14,7 @@ Return ONLY a JSON object with this exact structure:
   "summary": "your executive summary here",
   "actions": "• Action 1\\n• Action 2 - Owner: [OWNER]\\n• Action 3 - Deadline: [DATE]\\n• Action 4 - Owner: [OWNER] - Deadline: [DATE]",
   "email": "your email draft here"
-}
-
-IMPORTANT:
-- Format action items as a bulleted string with line breaks (\\n)
-- Only include owner and deadline information if they were mentioned in the transcript
-- Keep the format consistent and clean
-- Analyze the context to determine if owners or deadlines were implied
-- If no owners or deadlines were mentioned or implied, use simple bullet points`;
+}`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -39,7 +32,7 @@ IMPORTANT:
           },
           {
             role: 'user',
-            content: `Please process this transcript and format the response as specified. Remember to only include owner and deadline information if they were explicitly mentioned or clearly implied in the transcript:\n\n${text}`
+            content: `Please process this transcript and format the response as specified:\n\n${text}`
           }
         ],
         temperature: 0.7

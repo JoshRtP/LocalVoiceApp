@@ -1,11 +1,10 @@
 import { useState, useRef } from 'react'
-import { Button, Stack, Text, TextInput } from '@mantine/core'
-import { FaMicrophone, FaStop } from 'react-icons/fa'
+import { Button, Stack, Text } from '@mantine/core'
+import { IconMicrophone, IconPlayerStop } from '@tabler/icons-react'
 
-export default function VoiceRecorder({ onTranscriptionComplete }) {
+export default function VoiceRecorder({ onTranscriptionComplete, apiKey }) {
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState(null)
-  const [apiKey, setApiKey] = useState('')
   const mediaRecorder = useRef(null)
   const audioChunks = useRef([])
 
@@ -103,18 +102,10 @@ export default function VoiceRecorder({ onTranscriptionComplete }) {
 
   return (
     <Stack align="center" spacing="md">
-      <TextInput
-        label="OpenAI API Key"
-        value={apiKey}
-        onChange={(e) => setApiKey(e.target.value)}
-        placeholder="Enter your OpenAI API key"
-        type="password"
-        style={{ width: '100%' }}
-      />
       {error && <Text color="red">{error}</Text>}
       {!isRecording ? (
         <Button 
-          leftSection={<FaMicrophone />}
+          leftSection={<IconMicrophone size={rem(20)} />}
           onClick={startRecording}
           color="blue"
           size="lg"
@@ -124,7 +115,7 @@ export default function VoiceRecorder({ onTranscriptionComplete }) {
         </Button>
       ) : (
         <Button 
-          leftSection={<FaStop />}
+          leftSection={<IconPlayerStop size={rem(20)} />}
           onClick={stopRecording}
           color="red"
           size="lg"
