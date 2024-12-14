@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Container, Title, Stack, Textarea, Button, Text, LoadingOverlay, Paper, Group, TextInput } from '@mantine/core'
-import { IconMicrophone, IconFileText, IconFileUpload } from '@tabler/icons-react'
+import { IconMicrophone, IconFileText, IconFileUpload, IconPlayerStop } from '@tabler/icons-react'
+import Stopwatch from './components/Stopwatch'
 
 export default function App() {
   const [transcription, setTranscription] = useState('')
@@ -201,7 +202,7 @@ Return ONLY a JSON object with this exact structure:
       })
 
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error?.message || 'Failed to process with GPT-4')
+      if (!response.ok) throw new Error(data.error?.message || 'Failed to process with gpt-4o-mini')
 
       const result = JSON.parse(data.choices[0].message.content)
       
@@ -217,7 +218,7 @@ Return ONLY a JSON object with this exact structure:
       setActions(formattedActions)
       setEmail(result.email)
     } catch (err) {
-      setError('Failed to process with GPT-4: ' + err.message)
+      setError('Failed to process with gpt-4o-mini: ' + err.message)
     } finally {
       setIsProcessing(false)
     }
@@ -250,23 +251,31 @@ Return ONLY a JSON object with this exact structure:
             />
             
             <Text fw={700} size="lg">Choose Input Method:</Text>
-            <Group grow>
-              {!isRecording ? (
-                <Button
-                  leftSection={<IconMicrophone size={20} />}
-                  onClick={startRecording}
-                  disabled={!apiKey}
-                >
-                  Start Recording
-                </Button>
-              ) : (
-                <Button
-                  color="red"
-                  onClick={stopRecording}
-                >
-                  Stop Recording
-                </Button>
-              )}
+            <Group grow align="center">
+              <Group spacing="md">
+                {!isRecording ? (
+                  <Button
+                    leftSection={<IconMicrophone size={20} />}
+                    onClick={startRecording}
+                    disabled={!apiKey}
+                  >
+                    Start Recording
+                  </Button>
+                ) : (
+                  <Group spacing="md">
+                    <Button
+                      color="red"
+                      onClick={stopRecording}
+                      leftSection={<IconPlayerStop size={20} />}
+                    >
+                      Stop Recording
+                    </Button>
+                    <Paper p="xs" withBorder>
+                      <Stopwatch isRunning={isRecording} />
+                    </Paper>
+                  </Group>
+                )}
+              </Group>
 
               <Button
                 leftSection={<IconFileText size={20} />}
@@ -306,8 +315,7 @@ Return ONLY a JSON object with this exact structure:
             )}
           </Stack>
         </Paper>
-
-        {transcription && (
+ {transcription && (
           <>
             <Paper shadow="xs" p="md" withBorder>
               <Stack spacing="md">
@@ -374,3 +382,4 @@ Return ONLY a JSON object with this exact structure:
     </Container>
   )
 }
+

@@ -24,7 +24,7 @@ Return ONLY a JSON object with this exact structure:
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -41,7 +41,7 @@ Return ONLY a JSON object with this exact structure:
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error?.message || 'Failed to process with GPT-4');
+      throw new Error(errorData.error?.message || 'Failed to process with GPT-4o-mini');
     }
 
     const data = await response.json();
@@ -68,7 +68,7 @@ Return ONLY a JSON object with this exact structure:
       };
     } catch (parseError) {
       console.error('JSON Parse Error:', parseError);
-      console.log('Raw GPT-4 Response:', content);
+      console.log('Raw GPT-4o-mini Response:', content);
       
       return {
         summary: "Error processing summary",
@@ -77,7 +77,7 @@ Return ONLY a JSON object with this exact structure:
       };
     }
   } catch (error) {
-    console.error('Error in GPT-4 processing:', error);
-    throw new Error(`GPT-4 Processing Error: ${error.message}`);
+    console.error('Error in GPT-4o-mini processing:', error);
+    throw new Error(`GPT-4o-mini Processing Error: ${error.message}`);
   }
 }
