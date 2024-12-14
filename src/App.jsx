@@ -26,7 +26,6 @@ export default function App() {
         video: false
       })
       
-      // Check supported MIME types
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm'
@@ -47,7 +46,7 @@ export default function App() {
       mediaRecorder.current.onstop = async () => {
         try {
           const audioBlob = new Blob(audioChunks.current, { type: mimeType })
-          console.log('Audio format:', mimeType) // Debug log
+          console.log('Audio format:', mimeType)
           await handleAudioData(audioBlob)
         } catch (error) {
           console.error('Error processing audio:', error)
@@ -172,7 +171,7 @@ export default function App() {
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
