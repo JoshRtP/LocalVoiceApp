@@ -66,12 +66,31 @@ export default function App() {
     }
 
     try {
-      const text = await file.text()
+      let text = ''
+      
+      if (file.type === 'text/plain') {
+        text = await file.text()
+      } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        setError('Note: .docx files are limited to text content only')
+        text = await file.text()
+        text = text.replace(/[^\x20-\x7E\n]/g, ' ')
+                   .replace(/\s+/g, ' ')
+                   .trim()
+      } else {
+        setError('Please upload a .txt or .docx file')
+        return
+      }
+
+      if (!text.trim()) {
+        setError('The file appears to be empty or contains no readable text')
+        return
+      }
+
       setTranscription(text)
-      processWithGPT4(text)
+      await processWithGPT4(text)
     } catch (error) {
-      console.error('Error reading text file:', error)
-      setError('Error reading text file. Please try again.')
+      console.error('Error reading file:', error)
+      setError('Error reading file. Please try again with a different file.')
     }
   }
 
@@ -138,11 +157,22 @@ export default function App() {
           messages: [
             {
               role: 'system',
-              content: `Process this transcript and create:
-                1. An executive summary (max 250 words)
-                2. A bulleted list of actionable items
-                3. A professional email draft
-                Return as JSON with keys: summary, actions, email`
+              content: `Process this transcript and create three outputs:
+
+1. An executive summary (max 250 words)
+2. A bulleted list of actionable items with the following rules:
+   - Each item MUST start with "• " (bullet point)
+   - Only include " - Owner: [OWNER]" if an owner is explicitly mentioned
+   - Only include " - Deadline: [DATE]" if a deadline is explicitly mentioned
+   - If no owner or deadline is mentioned, only include the action item with bullet point
+3. A professional email draft including key points and next steps
+
+Return ONLY a JSON object with this exact structure:
+{
+  "summary": "your executive summary here",
+  "actions": "• Action item 1\\n• Action item 2 - Owner: [OWNER]\\n• Action item 3 - Deadline: [DATE]",
+  "email": "your email draft here"
+}`
             },
             {
               role: 'user',
@@ -156,8 +186,17 @@ export default function App() {
       if (!response.ok) throw new Error(data.error?.message || 'Failed to process with GPT-4')
 
       const result = JSON.parse(data.choices[0].message.content)
+      
+      // Ensure consistent bullet point formatting
+      const formattedActions = result.actions
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line) // Remove empty lines
+        .map(line => line.startsWith('•') ? line : `• ${line}`)
+        .join('\n')
+
       setSummary(result.summary)
-      setActions(result.actions)
+      setActions(formattedActions)
       setEmail(result.email)
     } catch (err) {
       setError('Failed to process with GPT-4: ' + err.message)
