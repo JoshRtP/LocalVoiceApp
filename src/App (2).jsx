@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
-import { Container, Title, Stack, Button, Text, LoadingOverlay, Paper, Group, TextInput } from '@mantine/core';
+import { Container, Title, Stack, Textarea, Button, Text, LoadingOverlay, Paper, Group, TextInput } from '@mantine/core';
 import { IconMicrophone, IconFileText, IconFileUpload, IconPlayerStop } from '@tabler/icons-react';
 import Stopwatch from './components/Stopwatch';
-import OutputSection from './components/OutputSection';
-import { processWithGPT4 } from './services/ai';
+
+// Automatically load the API key from the environment variables
+const apiKeyFromEnv = import.meta.env.VITE_OPENAI_API_KEY || '';
 
 export default function App() {
     const [transcription, setTranscription] = useState('');
@@ -12,7 +13,7 @@ export default function App() {
     const [email, setEmail] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState(null);
-    const [apiKey, setApiKey] = useState(import.meta.env.VITE_OPENAI_API_KEY || '');
+    const [apiKey, setApiKey] = useState(apiKeyFromEnv);
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
@@ -49,6 +50,7 @@ export default function App() {
             mediaRecorder.current.onstop = async () => {
                 try {
                     const audioBlob = new Blob(audioChunks.current, { type: mimeType });
+                    console.log('Audio format:', mimeType);
                     await handleAudioData(audioBlob);
                 } catch (error) {
                     console.error('Error processing audio:', error);
@@ -67,7 +69,7 @@ export default function App() {
     const stopRecording = () => {
         if (mediaRecorder.current && isRecording) {
             mediaRecorder.current.stop();
-            mediaRecorder.current.stream.getTracks().forEach(track => track.stop());
+            mediaRecorder.current.stream.getTracks().forEach((track) => track.stop());
             setIsRecording(false);
         }
     };
@@ -89,7 +91,8 @@ export default function App() {
             } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 setError('Note: .docx files are limited to text content only');
                 text = await file.text();
-                text = text.replace(/[^\x20-\x7E\n]/g, ' ')
+                text = text
+                    .replace(/[^\x20-\x7E\n]/g, ' ')
                     .replace(/\s+/g, ' ')
                     .trim();
             } else {
@@ -103,7 +106,7 @@ export default function App() {
             }
 
             setTranscription(text);
-            await processText(text);
+            await processWithGPT4(text);
         } catch (error) {
             console.error('Error reading file:', error);
             setError('Error reading file. Please try again with a different file.');
@@ -131,6 +134,9 @@ export default function App() {
         setIsProcessing(true);
         setError(null);
 
+        console.log('Audio blob type:', audioBlob.type);
+        console.log('Audio blob size:', audioBlob.size);
+
         const formData = new FormData();
         formData.append('file', audioBlob, 'recording.webm');
         formData.append('model', 'whisper-1');
@@ -139,9 +145,9 @@ export default function App() {
             const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${apiKey}`,
+                    Authorization: `Bearer ${apiKey}`
                 },
-                body: formData,
+                body: formData
             });
 
             if (!response.ok) {
@@ -151,7 +157,7 @@ export default function App() {
 
             const data = await response.json();
             setTranscription(data.text);
-            await processText(data.text);
+            await processWithGPT4(data.text);
         } catch (err) {
             setError('Failed to process audio: ' + err.message);
             console.error('Audio processing error:', err);
@@ -160,15 +166,104 @@ export default function App() {
         }
     };
 
-    const processText = async (text) => {
+    const processWithGPT4 = async (text) => {
         setIsProcessing(true);
         try {
-            const result = await processWithGPT4(text, apiKey);
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `Process this transcript and create three outputs:
+
+1. An executive summary (max 250 words)
+2. A bulleted list of actionable items with the following rules:
+   - Each item MUST start with "• " (bullet point)
+   - Only include " - Owner: [OWNER]" if an owner is explicitly mentioned
+   - Only include " - Deadline: [DATE]" if a deadline is explicitly mentioned
+   - If no owner or deadline is mentioned, only include the action item with bullet point
+3. A professional email draft including key points and next steps with the following rules:
+
+1. Key Action Items and Takeaways
+•	Always start communications with the most critical action items or key takeaways to ensure clarity and prioritize the reader’s focus.
+•	Format these sections using bolded and underlined headings for visibility.
+•	Use bullet points to break down each item concisely.
+________________________________________
+2. Voice and Tone
+•	Professional yet approachable: Balances expertise with accessibility, avoiding overly formal or distant language.
+•	Engaging and clear: Focuses on creating interest while maintaining clarity and precision.
+•	Concise but substantive: Prefers impactful statements over verbosity, ensuring every sentence adds value.
+________________________________________
+3. Language Preferences
+•	Specific and straightforward: Avoids jargon unless it’s relevant or explained for the audience.
+•	Inclusive phrasing: Uses terms that make the reader feel involved or empowered.
+•	Avoids hyperbole: Does not overstate or exaggerate points; relies on evidence-based claims.
+________________________________________
+4. Sentence Structure
+•	Varied but balanced: Uses a mix of short, impactful sentences and longer, more detailed ones for rhythm and flow.
+•	Logical progression: Ideas flow naturally from one to the next, ensuring readers can follow complex topics with ease.
+________________________________________
+5. Formatting Preferences
+•	Bolded and underlined headings: Major sections are emphasized with bold and underlined headings for clear structure.
+•	Organized and scannable: Uses headings, bullet points, and numbering to break down information for easy consumption.
+•	Action items and next steps: Always formatted as bolded headings with bullet points to ensure clarity and focus.
+•	Highlights key takeaways: Bold important phrases or sections to emphasize critical points without overloading the page visually.
+________________________________________
+6. Tone for Different Contexts
+•	Informative content: Uses a teaching tone that empowers the audience to understand and apply concepts.
+•	Persuasive content: Focuses on evidence and logical arguments to convince the reader, avoiding emotional appeals.
+•	Creative content: Adds a touch of wit or clever phrasing when the context allows but never at the expense of clarity.
+________________________________________
+7. Common Phrasing and Approaches
+•	Analogies and metaphors: Uses comparisons to clarify complex ideas but ensures they remain relevant and intuitive.
+•	Questions and reflection: Invites readers to think critically or engage actively with the content.
+•	Actionable language: Provides clear steps or recommendations to guide readers toward specific outcomes.
+________________________________________
+8. Avoidances
+•	Buzzwords or filler phrases: Prefers meaningful content over trend-driven language.
+•	Overly casual slang: Maintains professionalism, even in approachable tones.
+•	Over-complication: Breaks down complex ideas rather than complicating them further.
+
+
+
+Return ONLY a JSON object with this exact structure:
+{
+  "summary": "your executive summary here",
+  "actions": "\u2022 Action item 1\n\u2022 Action item 2 - Owner: [OWNER]\n\u2022 Action item 3 - Deadline: [DATE]",
+  "email": "your email draft here"
+}`
+                        },
+                        {
+                            role: 'user',
+                            content: text
+                        }
+                    ]
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error?.message || 'Failed to process with gpt-4o-mini');
+
+            const result = JSON.parse(data.choices[0].message.content);
+
+            const formattedActions = result.actions
+                .split('\n')
+                .map((line) => line.trim())
+                .filter((line) => line)
+                .map((line) => (line.startsWith('•') ? line : `• ${line}`))
+                .join('\n');
+
             setSummary(result.summary);
-            setActions(result.actions);
+            setActions(formattedActions);
             setEmail(result.email);
         } catch (err) {
-            setError(err.message);
+            setError('Failed to process with gpt-4o-mini: ' + err.message);
         } finally {
             setIsProcessing(false);
         }
@@ -200,7 +295,9 @@ export default function App() {
                             required
                         />
 
-                        <Text fw={700} size="lg">Choose Input Method:</Text>
+                        <Text fw={700} size="lg">
+                            Choose Input Method:
+                        </Text>
                         <Group grow align="center">
                             <Group spacing="md">
                                 {!isRecording ? (
@@ -265,40 +362,70 @@ export default function App() {
                         )}
                     </Stack>
                 </Paper>
-
                 {transcription && (
                     <>
-                        <OutputSection
-                            title="Raw Transcription"
-                            content={transcription}
-                            onCopy={() => copyToClipboard(transcription)}
-                            onEdit={setTranscription}
-                            isHtml={false}
-                        />
+                        <Paper shadow="xs" p="md" withBorder>
+                            <Stack spacing="md">
+                                <Text fw={700} size="lg">
+                                    Raw Transcription:
+                                </Text>
+                                <Textarea value={transcription} readOnly minRows={4} autosize />
+                                <Button onClick={() => copyToClipboard(transcription)}>
+                                    Copy Transcription
+                                </Button>
+                            </Stack>
+                        </Paper>
 
-                        <OutputSection
-                            title="Executive Summary"
-                            content={summary}
-                            onCopy={() => copyToClipboard(summary)}
-                            onEdit={setSummary}
-                            isHtml={false}
-                        />
+                        <Paper shadow="xs" p="md" withBorder>
+                            <Stack spacing="md">
+                                <Text fw={700} size="lg">
+                                    Executive Summary:
+                                </Text>
+                                <Textarea
+                                    value={summary}
+                                    onChange={(e) => setSummary(e.target.value)}
+                                    minRows={4}
+                                    autosize
+                                />
+                                <Button onClick={() => copyToClipboard(summary)}>
+                                    Copy Summary
+                                </Button>
+                            </Stack>
+                        </Paper>
 
-                        <OutputSection
-                            title="Action Items"
-                            content={actions}
-                            onCopy={() => copyToClipboard(actions)}
-                            onEdit={setActions}
-                            isHtml={false}
-                        />
+                        <Paper shadow="xs" p="md" withBorder>
+                            <Stack spacing="md">
+                                <Text fw={700} size="lg">
+                                    Action Items:
+                                </Text>
+                                <Textarea
+                                    value={actions}
+                                    onChange={(e) => setActions(e.target.value)}
+                                    minRows={4}
+                                    autosize
+                                />
+                                <Button onClick={() => copyToClipboard(actions)}>
+                                    Copy Actions
+                                </Button>
+                            </Stack>
+                        </Paper>
 
-                        <OutputSection
-                            title="Email Draft"
-                            content={email}
-                            onCopy={() => copyToClipboard(email)}
-                            onEdit={setEmail}
-                            isHtml={true}
-                        />
+                        <Paper shadow="xs" p="md" withBorder>
+                            <Stack spacing="md">
+                                <Text fw={700} size="lg">
+                                    Email Draft:
+                                </Text>
+                                <Textarea
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    minRows={4}
+                                    autosize
+                                />
+                                <Button onClick={() => copyToClipboard(email)}>
+                                    Copy Email
+                                </Button>
+                            </Stack>
+                        </Paper>
                     </>
                 )}
             </Stack>
